@@ -1,0 +1,11 @@
+# Title: Summary, imperative, start upper case, don't end with a period
+# No more than 50 chars. #### 50 chars is here:  #
+
+# Remember blank line between title and body.
+
+# Body: Explain *what* and *why* (not *how*). Include task ID when applicable.
+# Wrap at 72 chars. ################################## which is here:  #
+
+
+# At the end: Include who authored the commit
+# Co-authored-by: mmuyakwa <mmuyakwa@users.noreply.github.com>
