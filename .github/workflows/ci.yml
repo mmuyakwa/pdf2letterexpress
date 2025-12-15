@@ -51,7 +51,7 @@ jobs:
       run: go tool cover -html=coverage.out -o coverage.html
 
     - name: Upload coverage to artifacts
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: coverage-report
         path: coverage.html
@@ -98,7 +98,7 @@ jobs:
         go build -ldflags "-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME}" -o bin/${BINARY_NAME} main.go
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: pdf2letterexpress-${{ matrix.goos }}-${{ matrix.goarch }}
         path: bin/pdf2letterexpress-${{ matrix.goos }}-${{ matrix.goarch }}*
