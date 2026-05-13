@@ -280,49 +280,82 @@ func (p *PDFProcessor) CreateMarginsWithImageMagick(inputFile, outputFile string
 		return fmt.Errorf("imagemagick not available: %w", err)
 	}
 
-	// Use ImageMagick to add margins by scaling and centering
-	// This converts PDF to image and back, but creates visible margins
-	tempDir := filepath.Dir(outputFile)
-	tempImagePattern := filepath.Join(tempDir, "temp_page_%d.png")
-
-	// Step 1: Convert PDF to high-resolution images
-	cmd1 := exec.Command("convert",
-		"-density", "300", // High DPI for quality
-		inputFile,
-		tempImagePattern,
-	)
-
-	logrus.WithField("command", strings.Join(cmd1.Args, " ")).Debug("Converting PDF to images")
-	output1, err := cmd1.CombinedOutput()
+	// Determine total page count
+	pageCount, err := api.PageCountFile(inputFile)
 	if err != nil {
-		logrus.WithError(err).WithField("output", string(output1)).Error("PDF to image conversion failed")
-		return fmt.Errorf("pdf to image conversion failed: %w", err)
+		f, openErr := os.Open(inputFile)
+		if openErr != nil {
+			return fmt.Errorf("failed to open input file: %w", openErr)
+		}
+		ctx, readErr := api.ReadContext(f, p.config)
+		f.Close()
+		if readErr != nil {
+			return fmt.Errorf("failed to determine page count: %w", readErr)
+		}
+		pageCount = ctx.PageCount
 	}
 
-	// Step 2: Add margins to images and convert back to PDF
-	// Calculate margin size as percentage of image
-	marginPercent := int(MarginMM * 2) // Rough conversion for margin percentage
+	logrus.WithField("pageCount", pageCount).Info("Processing all pages")
 
-	cmd2 := exec.Command("convert",
-		tempImagePattern,
-		"-bordercolor", "white",
-		"-border", fmt.Sprintf("%d%%x%d%%", marginPercent, marginPercent),
-		"-density", "300",
-		outputFile,
-	)
+	tempDir := filepath.Dir(outputFile)
+	marginPercent := int(MarginMM * 2)
 
-	logrus.WithField("command", strings.Join(cmd2.Args, " ")).Debug("Adding margins and converting back to PDF")
-	output2, err := cmd2.CombinedOutput()
+	var pageFiles []string
+	for i := 0; i < pageCount; i++ {
+		tempPageFile := filepath.Join(tempDir, fmt.Sprintf("temp_page_%d.png", i))
+		tempMarginFile := filepath.Join(tempDir, fmt.Sprintf("temp_margin_%d.png", i))
+		pageFiles = append(pageFiles, tempPageFile, tempMarginFile)
+
+		// Step 1: Convert this page to a high-resolution image
+		cmd1 := exec.Command("convert",
+			"-density", "300",
+			fmt.Sprintf("%s[%d]", inputFile, i),
+			tempPageFile,
+		)
+		logrus.WithField("command", strings.Join(cmd1.Args, " ")).Debug("Converting PDF page to image")
+		output1, err := cmd1.CombinedOutput()
+		if err != nil {
+			p.cleanupFiles(pageFiles)
+			logrus.WithError(err).WithField("output", string(output1)).Error("PDF to image conversion failed")
+			return fmt.Errorf("pdf to image conversion failed for page %d: %w", i, err)
+		}
+
+		// Step 2: Add margins to this page image
+		cmd2 := exec.Command("convert",
+			tempPageFile,
+			"-bordercolor", "white",
+			"-border", fmt.Sprintf("%d%%x%d%%", marginPercent, marginPercent),
+			"-density", "300",
+			tempMarginFile,
+		)
+		logrus.WithField("command", strings.Join(cmd2.Args, " ")).Debug("Adding margins to page image")
+		output2, err := cmd2.CombinedOutput()
+		if err != nil {
+			p.cleanupFiles(pageFiles)
+			logrus.WithError(err).WithField("output", string(output2)).Error("Margin addition failed")
+			return fmt.Errorf("margin addition failed for page %d: %w", i, err)
+		}
+	}
+
+	// Step 3: Combine all margin pages into a single PDF
+	var marginFiles []string
+	for i := 0; i < pageCount; i++ {
+		marginFiles = append(marginFiles, filepath.Join(tempDir, fmt.Sprintf("temp_margin_%d.png", i)))
+	}
+	cmd3Args := append(marginFiles, "-density", "300", outputFile)
+	cmd3 := exec.Command("convert", cmd3Args...)
+	logrus.WithField("command", strings.Join(cmd3.Args, " ")).Debug("Combining pages into final PDF")
+	output3, err := cmd3.CombinedOutput()
+	p.cleanupFiles(pageFiles)
 	if err != nil {
-		logrus.WithError(err).WithField("output", string(output2)).Error("Image to PDF conversion failed")
+		logrus.WithError(err).WithField("output", string(output3)).Error("Image to PDF conversion failed")
 		return fmt.Errorf("image to pdf conversion failed: %w", err)
 	}
 
-	// Clean up temporary files
-	cleanupCmd := exec.Command("rm", "-f", strings.Replace(tempImagePattern, "%d", "*", 1))
-	cleanupCmd.Run()
-
-	logrus.WithField("output", outputFile).Info("Successfully created PDF with ImageMagick margins")
+	logrus.WithFields(logrus.Fields{
+		"output": outputFile,
+		"pages":  pageCount,
+	}).Info("Successfully created PDF with ImageMagick margins")
 	return nil
 }
 
@@ -340,6 +373,24 @@ func (p *PDFProcessor) CreateMarginsForLetterXpress(inputFile, outputFile string
 		logrus.WithError(err).Error("ImageMagick not found")
 		return fmt.Errorf("imagemagick not available: %w", err)
 	}
+
+	// Determine total page count
+	pageCount, err := api.PageCountFile(inputFile)
+	if err != nil {
+		// Fallback: read context to get page count
+		f, openErr := os.Open(inputFile)
+		if openErr != nil {
+			return fmt.Errorf("failed to open input file: %w", openErr)
+		}
+		ctx, readErr := api.ReadContext(f, p.config)
+		f.Close()
+		if readErr != nil {
+			return fmt.Errorf("failed to determine page count: %w", readErr)
+		}
+		pageCount = ctx.PageCount
+	}
+
+	logrus.WithField("pageCount", pageCount).Info("Processing all pages")
 
 	// LetterXpress requires EXACT DIN A4: 210 × 297 mm
 	targetWidthMM := 210.0
@@ -375,71 +426,95 @@ func (p *PDFProcessor) CreateMarginsForLetterXpress(inputFile, outputFile string
 	}).Info("Calculated exact DIN A4 pixel dimensions")
 
 	tempDir := filepath.Dir(outputFile)
-	tempContentFile := filepath.Join(tempDir, "temp_content.png")
-	tempA4File := filepath.Join(tempDir, "temp_a4_canvas.png")
 
-	// Step 1: Convert PDF content to scaled image
-	cmd1 := exec.Command("convert",
-		"-density", fmt.Sprintf("%.0f", dpi),
-		"-background", "white",
-		"-flatten",
-		"-resize", fmt.Sprintf("%dx%d!", contentWidthPx, contentHeightPx), // Force exact size with !
-		inputFile+"[0]", // First page only
-		tempContentFile,
-	)
+	// Collect A4 page image paths for final merge; track all temp files for cleanup
+	var pageA4Files []string
+	var allTempFiles []string
 
-	logrus.WithField("command", strings.Join(cmd1.Args, " ")).Debug("Converting PDF to scaled content")
-	output1, err := cmd1.CombinedOutput()
-	if err != nil {
-		logrus.WithError(err).WithField("output", string(output1)).Error("PDF content conversion failed")
-		return fmt.Errorf("pdf content conversion failed: %w", err)
+	for i := 0; i < pageCount; i++ {
+		tempContentFile := filepath.Join(tempDir, fmt.Sprintf("temp_content_%d.png", i))
+		tempA4File := filepath.Join(tempDir, fmt.Sprintf("temp_a4_%d.png", i))
+		allTempFiles = append(allTempFiles, tempContentFile, tempA4File)
+
+		// Step 1: Convert this page to scaled content image
+		pageSelector := fmt.Sprintf("%s[%d]", inputFile, i)
+		cmd1 := exec.Command("convert",
+			"-density", fmt.Sprintf("%.0f", dpi),
+			"-background", "white",
+			"-flatten",
+			"-resize", fmt.Sprintf("%dx%d!", contentWidthPx, contentHeightPx),
+			pageSelector,
+			tempContentFile,
+		)
+
+		logrus.WithFields(logrus.Fields{
+			"page":    i,
+			"command": strings.Join(cmd1.Args, " "),
+		}).Debug("Converting PDF page to scaled content")
+		output1, err := cmd1.CombinedOutput()
+		if err != nil {
+			p.cleanupFiles(allTempFiles)
+			logrus.WithError(err).WithField("output", string(output1)).Error("PDF content conversion failed")
+			return fmt.Errorf("pdf content conversion failed for page %d: %w", i, err)
+		}
+
+		// Step 2: Create exact A4 white canvas and place content with margins
+		cmd2 := exec.Command("convert",
+			"-size", fmt.Sprintf("%dx%d", finalWidthPx, finalHeightPx),
+			"xc:white",
+			tempContentFile,
+			"-geometry", fmt.Sprintf("+%d+%d", marginPx, marginPx),
+			"-composite",
+			tempA4File,
+		)
+
+		logrus.WithFields(logrus.Fields{
+			"page":    i,
+			"command": strings.Join(cmd2.Args, " "),
+		}).Debug("Creating A4 canvas with content")
+		output2, err := cmd2.CombinedOutput()
+		if err != nil {
+			p.cleanupFiles(allTempFiles)
+			logrus.WithError(err).WithField("output", string(output2)).Error("A4 canvas creation failed")
+			return fmt.Errorf("a4 canvas creation failed for page %d: %w", i, err)
+		}
+
+		pageA4Files = append(pageA4Files, tempA4File)
 	}
 
-	// Step 2: Create exact A4 white canvas and place content with margins
-	cmd2 := exec.Command("convert",
-		"-size", fmt.Sprintf("%dx%d", finalWidthPx, finalHeightPx),
-		"xc:white", // Create white canvas
-		tempContentFile,
-		"-geometry", fmt.Sprintf("+%d+%d", marginPx, marginPx), // Position content with margins
-		"-composite",
-		tempA4File,
-	)
-
-	logrus.WithField("command", strings.Join(cmd2.Args, " ")).Debug("Creating A4 canvas with content")
-	output2, err := cmd2.CombinedOutput()
-	if err != nil {
-		logrus.WithError(err).WithField("output", string(output2)).Error("A4 canvas creation failed")
-		return fmt.Errorf("a4 canvas creation failed: %w", err)
-	}
-
-	// Step 3: Convert to PDF with exact DIN A4 size specification
-	cmd3 := exec.Command("convert",
-		tempA4File,
+	// Step 3: Combine all A4 page images into a single multi-page PDF
+	cmd3Args := append(pageA4Files,
 		"-density", fmt.Sprintf("%.0f", dpi),
 		"-compress", "jpeg",
 		"-quality", "95",
-		"-define", "pdf:page-size=a4", // Force A4 page size
+		"-define", "pdf:page-size=a4",
 		outputFile,
 	)
+	cmd3 := exec.Command("convert", cmd3Args...)
 
-	logrus.WithField("command", strings.Join(cmd3.Args, " ")).Debug("Converting to final A4 PDF")
+	logrus.WithField("command", strings.Join(cmd3.Args, " ")).Debug("Combining all pages into final A4 PDF")
 	output3, err := cmd3.CombinedOutput()
+	p.cleanupFiles(allTempFiles)
 	if err != nil {
 		logrus.WithError(err).WithField("output", string(output3)).Error("Final PDF creation failed")
 		return fmt.Errorf("final pdf creation failed: %w", err)
 	}
 
-	// Clean up temporary files
-	os.Remove(tempContentFile)
-	os.Remove(tempA4File)
-
 	logrus.WithFields(logrus.Fields{
 		"output":            outputFile,
+		"pages":             pageCount,
 		"finalSizeMM":       fmt.Sprintf("%.1f × %.1f mm", targetWidthMM, targetHeightMM),
 		"letterXpressReady": true,
 	}).Info("Successfully created LetterXpress-compatible PDF with exact DIN A4 format")
 
 	return nil
+}
+
+// cleanupFiles removes a list of temporary files, ignoring errors
+func (p *PDFProcessor) cleanupFiles(files []string) {
+	for _, f := range files {
+		os.Remove(f)
+	}
 }
 
 // CreateMargins - Main function using LetterXpress approach
