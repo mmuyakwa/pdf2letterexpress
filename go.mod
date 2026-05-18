@@ -1,6 +1,6 @@
 module github.com/yourorg/pdf2letterexpress
 
-go 1.23.0
+go 1.25.0
 
 require (
 	github.com/pdfcpu/pdfcpu v0.11.0
@@ -19,7 +19,7 @@ require (
 	github.com/spf13/pflag v1.0.7 // indirect
 	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/image v0.30.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
