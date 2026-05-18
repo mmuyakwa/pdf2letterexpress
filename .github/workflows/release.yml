@@ -38,7 +38,7 @@ jobs:
       run: make build-all
 
     - name: Create Release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         files: |
           bin/pdf2letterexpress-windows-amd64.exe
