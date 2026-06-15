@@ -3,7 +3,7 @@ module github.com/yourorg/pdf2letterexpress
 go 1.25.0
 
 require (
-	github.com/pdfcpu/pdfcpu v0.12.1
+	github.com/pdfcpu/pdfcpu v0.13.0
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
 )
