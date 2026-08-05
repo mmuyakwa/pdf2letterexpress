@@ -5,8 +5,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/hhrutter/lzw v1.0.1 h1:O2GxTN+WYl1JOLd2Vrhaz6J4PmM45hijnR7hoixPczM=
 github.com/hhrutter/lzw v1.0.1/go.mod h1:WZ1BPZW41wJD/3+kOBbkboEABug/9D1t2w7upQcSnFU=
-github.com/hhrutter/pkcs7 v0.2.2 h1:xMoifoVWah1LNym3C0pomEiLmyJyVIBXt/8oTPyPz+8=
-github.com/hhrutter/pkcs7 v0.2.2/go.mod h1:aEzKz0+ZAlz7YaEMY47jDHL14hVWD6iXt0AgqgAvWgE=
+github.com/hhrutter/pkcs7 v0.2.3 h1:3opEaUY3yS9XtFMjRkRtlqrEY9x43dPeObWEUQVuKiQ=
+github.com/hhrutter/pkcs7 v0.2.3/go.mod h1:LQGm/jc1ItmQojVZaFVr5DcbxliA2So6/FbWoXF9tuw=
 github.com/hhrutter/tiff v1.0.6 h1:p5I4Oi20jit3uWIBBaAoMDqrKztw/1JQCQC2TgqK1qU=
 github.com/hhrutter/tiff v1.0.6/go.mod h1:9+PDcnTBkMrJ8fWXkN1ZPv5ZNcKsFuTGVQU3ysaQbco=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
