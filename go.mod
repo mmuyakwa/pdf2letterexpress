@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/pdfcpu/pdfcpu v0.14.0
-	github.com/sirupsen/logrus v1.9.4
+	github.com/sirupsen/logrus v1.10.0
 	github.com/spf13/cobra v1.10.2
 )
 
