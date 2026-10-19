@@ -3,7 +3,7 @@ module github.com/yourorg/pdf2letterexpress
 go 1.26.0
 
 require (
-	github.com/pdfcpu/pdfcpu v0.16.1
+	github.com/pdfcpu/pdfcpu v0.16.2
 	github.com/sirupsen/logrus v1.10.2
 	github.com/spf13/cobra v1.10.2
 )
@@ -14,6 +14,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/mattn/go-runewidth v0.0.31 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/xdg-go/stringprep v1.0.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/image v0.47.0 // indirect
